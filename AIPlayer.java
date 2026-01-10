@@ -1,120 +1,91 @@
 import java.util.*;
 
 public class AIPlayer extends Player {
+    private List<Move> precalculatedMoves = null;
+    private int currentTurn = 0;
+    private int maxDepth = 30;
 
     public AIPlayer(String name) {
         super(name);
     }
 
+    public void setMaxDepth(int depth) {
+        this.maxDepth = depth;
+    }
+
+    // Clears the memory so the next level doesn't use old moves
+    public void reset() {
+        this.precalculatedMoves = null;
+        this.currentTurn = 0;
+    }
+
     @Override
     public Move chooseMove(GameState currentState) {
-        System.out.println("[AI] Thinking...");
-
-        int targetPiece = currentState.getTargetPiece();
-        List<Move> possibleMoves = currentState.generatePossibleMoves();
-
-        if (possibleMoves.isEmpty()) {
-            return null;
+        if (precalculatedMoves == null) {
+            precalculatedMoves = solveAStar(currentState);
         }
 
-        System.out.println("[AI] Target is piece " + targetPiece);
-
-        Move bestMove = null;
-        int bestScore = Integer.MIN_VALUE;
-
-        for (Move move : possibleMoves) {
-            int score = evaluateMove(move, currentState);
-
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
-            }
+        if (precalculatedMoves != null && currentTurn < precalculatedMoves.size()) {
+            return precalculatedMoves.get(currentTurn++);
         }
-
-        if (bestMove != null) {
-            System.out.println("[AI] Selected: " + bestMove + " (score: " + bestScore + ")");
-        }
-
-        return bestMove;
+        return null;
     }
 
-    private int evaluateMove(Move move, GameState state) {
-        int score = 0;
-        int targetPiece = state.getTargetPiece();
-        int[] positions = state.getPositions();
+    private List<Move> solveAStar(GameState startState) {
+        // PriorityQueue sorts by: (Moves Taken + Distance Remaining)
+        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingInt(n -> (n.moves.size() + n.h)));
 
-        int movingPiece = move.getPieceNumber();
-        int toPos = move.getToPosition();
+        pq.add(new Node(startState, new ArrayList<>(), calculateH(startState)));
+        Set<String> visited = new HashSet<>();
 
-        // CRITICAL FIX: Prioritize moving the TARGET piece
-        if (movingPiece == targetPiece) {
-            score += 200;  // Big bonus for moving target
+        while (!pq.isEmpty()) {
+            Node current = pq.poll();
 
-            int currentPos = positions[targetPiece - 1];
-            int currentDist = distanceToZero(currentPos);
-            int newDist = distanceToZero(toPos);
+            if (current.state.isWinning()) return current.moves;
 
-            if (newDist < currentDist) {
-                score += 100;  // Bonus for moving closer to 0
-            }
+            int turnIndex = current.moves.size();
+            if (turnIndex >= maxDepth) continue;
 
-            if (toPos == 0) {
-                score += 10000;  // HUGE bonus for winning!
-            }
-        } else {
-            score -= 50;  // Penalty for moving non-target
-        }
+            int nextDice = GameMain.getDiceAtTurn(turnIndex);
+            if (nextDice == -1) continue;
 
-        // Check if this move captures another piece
-        for (int i = 0; i < positions.length; i++) {
-            if (positions[i] == toPos && (i + 1) != movingPiece) {
-                int capturedPiece = i + 1;
+            GameState simState = new GameState(current.state.getPositions(), nextDice, current.state.getTargetPiece());
 
-                if (capturedPiece == targetPiece) {
-                    score -= 1000;  // VERY BAD to capture target!
-                } else {
-                    score += 30;  // Good to capture non-target
+            for (Move m : simState.generatePossibleMoves()) {
+                GameState nextState = new GameState(current.state.getPositions(), nextDice, current.state.getTargetPiece());
+                nextState.applyMove(m);
+
+                // Include turn index in key to handle changing dice sequence
+                String key = Arrays.toString(nextState.getPositions()) + "T" + turnIndex;
+
+                if (visited.add(key)) {
+                    List<Move> nextMoves = new ArrayList<>(current.moves);
+                    nextMoves.add(m);
+                    pq.add(new Node(nextState, nextMoves, calculateH(nextState)));
                 }
-                break;
             }
         }
-
-        // Bonus for clearing path to 0
-        if (clearsPathForTarget(move, positions, targetPiece)) {
-            score += 40;
-        }
-
-        return score;
+        return null;
     }
 
-    private boolean clearsPathForTarget(Move move, int[] positions, int targetPiece) {
-        int targetPos = positions[targetPiece - 1];
-        if (targetPos == -1) return false;
+    private int calculateH(GameState state) {
+        int targetPos = state.getPositions()[state.getTargetPiece() - 1];
+        if (targetPos == -1) return 999;
+        if (targetPos == 0) return 0;
 
-        int movedFrom = move.getFromPosition();
-
-        // Check if moved piece was between target and square 0
-        return isBetween(targetPos, movedFrom, 0);
+        // Chebyshev distance (Diagonal steps to 0)
+        return Math.max(targetPos / 10, targetPos % 10);
     }
 
-    private boolean isBetween(int a, int b, int c) {
-        int aRow = a / 10, aCol = a % 10;
-        int bRow = b / 10, bCol = b % 10;
-        int cRow = c / 10, cCol = c % 10;
+    private static class Node {
+        GameState state;
+        List<Move> moves;
+        int h;
 
-        if (aRow == cRow && bRow == aRow) {
-            return (aCol < bCol && bCol < cCol) || (cCol < bCol && bCol < aCol);
+        Node(GameState s, List<Move> m, int h) {
+            this.state = s;
+            this.moves = m;
+            this.h = h;
         }
-        if (aCol == cCol && bCol == aCol) {
-            return (aRow < bRow && bRow < cRow) || (cRow < bRow && bRow < aRow);
-        }
-        return false;
-    }
-
-    private int distanceToZero(int position) {
-        if (position == -1) return 999;
-        int row = position / 10;
-        int col = position % 10;
-        return row + col;
     }
 }

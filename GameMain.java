@@ -1,106 +1,107 @@
-import java.io.*;
-import java.util.*;
+import java.util.Scanner;
 
 public class GameMain {
+    private static int[] staticDiceSequence;
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-
         System.out.println("=== EWN Puzzle Solver ===");
 
-        System.out.println("\nChoose player type:");
-        System.out.println("1. Human Player");
-        System.out.println("2. Random Player");
-        System.out.println("3. AI Player");
-        System.out.print("Choice (1-3): ");
+        // 1. Prompt for Mode and create Player object
+        System.out.println("\nChoose player type:\n1. Human\n2. Random\n3. AI");
+        System.out.print("Choice: ");
+        int choice = scanner.nextInt();
+        scanner.nextLine(); // Consume newline left over from nextInt()
 
-        int playerType = scanner.nextInt();
-        scanner.nextLine();
-
-        String playerName;
         Player player;
+        String name;
 
-        switch (playerType) {
+        switch (choice) {
             case 1:
-                System.out.print("Enter your name: ");
-                playerName = scanner.nextLine();
-                player = new HumanPlayer(playerName);
+                // 2. Prompt for Human Name
+                System.out.print("Enter Human Player name: ");
+                name = scanner.nextLine();
+                player = new HumanPlayer(name);
                 break;
             case 2:
-                playerName = "Random Player";
-                player = new RandomPlayer(playerName);
+                // Default Name for Random
+                player = new RandomPlayer("Random Player");
                 break;
             case 3:
-                playerName = "AI Player";
-                player = new AIPlayer(playerName);
+                // Default Name for AI
+                player = new AIPlayer("AI Player");
                 break;
             default:
-                System.out.println("Invalid choice, using Random Player");
-                playerName = "Random Player";
-                player = new RandomPlayer(playerName);
+                throw new IllegalArgumentException("Invalid player option: " + choice);
         }
 
-        System.out.print("\nChoose level (1-4): ");
+        // 3. Prompt for Level
+        System.out.print("Choose level (1-4): ");
         int level = scanner.nextInt();
         String filename = "TestCases/level" + level + ".txt";
 
-        GameLoader loader = new GameLoader(filename);
-
-        try {
-            PrintWriter clear = new PrintWriter("moves.txt");
-            clear.close();
-        } catch (Exception e) {}
-
-        loader.printGameDetails(playerName);
-
-        int[] positions = loader.getInitialPositions().clone();
-        int targetPiece = loader.getTargetPiece();
-        int[] diceSequence = loader.getDiceSequence();
-
-        System.out.println("\n=== GAME START ===");
-        System.out.println("Target: Piece " + targetPiece + " must reach square 0");
-        System.out.println("Max turns: " + diceSequence.length);
-        System.out.println("Initial positions:");
-        for (int i = 0; i < positions.length; i++) {
-            System.out.println("  P" + (i+1) + ": " + positions[i]);
+        // Set move limits based on level
+        int moveLimit = 30;
+        switch (level) {
+            case 1: moveLimit = 6; break;
+            case 2: moveLimit = 10; break;
+            case 3: moveLimit = 10; break;
+            case 4: moveLimit = 15; break;
         }
 
-        boolean won = false;
-        for (int turn = 0; turn < diceSequence.length; turn++) {
-            System.out.println("\n=== Turn " + (turn + 1) + " ===");
-            System.out.println("Dice: " + diceSequence[turn]);
+        if (player instanceof AIPlayer) {
+            ((AIPlayer) player).setMaxDepth(moveLimit);
+        }
 
-            GameState state = new GameState(positions, diceSequence[turn], targetPiece);
+        // Load game data
+        GameLoader loader = new GameLoader(filename);
+        staticDiceSequence = loader.getDiceSequence();
+        int[] positions = loader.getInitialPositions();
+        int targetPiece = loader.getTargetPiece();
 
+        loader.printGameDetails(player.getName());
+
+        System.out.println("\n=== GAME START ===");
+        System.out.println("Player: " + player.getName());
+        System.out.println("Move Limit: " + moveLimit);
+
+        boolean solved = false;
+        int turnsTaken = 0;
+
+        for (int turn = 0; turn < staticDiceSequence.length; turn++) {
+            turnsTaken = turn + 1;
+            GameState state = new GameState(positions, staticDiceSequence[turn], targetPiece);
+
+            // 4. Call chooseMove function
             Move move = player.chooseMove(state);
+
             if (move == null) {
-                System.out.println("No valid move available!");
+                System.out.println("No valid moves available.");
                 break;
             }
 
             state.applyMove(move);
             positions = state.getPositions();
-
             player.printMove(positions);
 
             if (state.isWinning()) {
-                System.out.println("\n*** VICTORY! ***");
-                System.out.println("Solved in " + (turn + 1) + " moves!");
-                won = true;
+                solved = true;
                 break;
             }
-
-            if (turn == 29) {
-                System.out.println("Last turn reached!");
-            }
         }
 
-        if (!won) {
-            System.out.println("\n*** GAME OVER - Target not reached ***");
+        // 5. Show result of the game
+        System.out.println("\n=== GAME OVER ===");
+        if (solved) {
+            System.out.println("RESULT: Puzzle SOLVED in " + turnsTaken + " moves!");
+        } else {
+            System.out.println("RESULT: Puzzle NOT solved. Better luck next time!");
         }
-
-        System.out.println("\nGame saved to moves.txt");
-        System.out.println("Run: java -jar EWN_GUI.jar to visualize");
 
         scanner.close();
+    }
+
+    public static int getDiceAtTurn(int turn) {
+        return staticDiceSequence != null && turn < staticDiceSequence.length ? staticDiceSequence[turn] : -1;
     }
 }

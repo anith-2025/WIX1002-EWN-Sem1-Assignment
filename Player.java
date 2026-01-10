@@ -18,13 +18,15 @@ public abstract class Player {
 
             for (int i = 0; i < 6; i++) {
                 pw.print(piecePositions[i]);
-                if (i < 5) pw.print(" ");
+                if (i < 5)
+                    pw.print(" ");
             }
             pw.println();
 
             pw.close();
         } catch (IOException ex) {
             System.out.println("Error writing to moves.txt");
+            ex.printStackTrace();
         }
     }
 

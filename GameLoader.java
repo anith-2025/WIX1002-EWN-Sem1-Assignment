@@ -30,30 +30,47 @@ public class GameLoader {
 
     public void printGameDetails(String playerName) {
         try {
-            PrintWriter writer = new PrintWriter("moves.txt");
+            File file = new File("moves.txt");
+            System.out.println("[DEBUG] Creating moves file at: " + file.getAbsolutePath());
+            PrintWriter writer = new PrintWriter(file);
 
             writer.println(playerName);
 
-            for (int dice : diceSequence) {
-                writer.print(dice);
+            // FIXED: Add spaces between dice numbers
+            for (int i = 0; i < diceSequence.length; i++) {
+                writer.print(diceSequence[i]);
+                if (i < diceSequence.length - 1) {
+                    writer.print(" ");
+                }
             }
             writer.println();
 
             writer.println(targetPiece);
 
+            // FIXED: Add spaces between positions
             for (int i = 0; i < 6; i++) {
                 writer.print(initialPositions[i]);
-                if (i < 5) writer.print(" ");
+                if (i < 5)
+                    writer.print(" ");
             }
             writer.println();
 
             writer.close();
         } catch (IOException e) {
             System.out.println("Error writing to moves.txt");
+            e.printStackTrace();
         }
     }
 
-    public int getTargetPiece() { return targetPiece; }
-    public int[] getInitialPositions() { return initialPositions.clone(); }
-    public int[] getDiceSequence() { return diceSequence.clone(); }
+    public int getTargetPiece() {
+        return targetPiece;
+    }
+
+    public int[] getInitialPositions() {
+        return initialPositions.clone();
+    }
+
+    public int[] getDiceSequence() {
+        return diceSequence.clone();
+    }
 }

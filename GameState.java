@@ -1,4 +1,6 @@
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class GameState {
     private int[] positions;
@@ -6,94 +8,105 @@ public class GameState {
     private int targetPiece;
 
     public GameState(int[] positions, int diceNumber, int targetPiece) {
-        this.positions = positions.clone();
+        this.positions = (int[])positions.clone();
         this.diceNumber = diceNumber;
         this.targetPiece = targetPiece;
     }
 
     public List<Move> generatePossibleMoves() {
+        // Added <Move> to remove the warning
         List<Move> moves = new ArrayList<>();
+        List<Integer> movablePieces = this.findMovablePieces();
+        Iterator<Integer> iterator = movablePieces.iterator();
 
-        int pieceToMove = findMovablePiece();
-        if (pieceToMove == -1) return moves;
+        while(iterator.hasNext()) {
+            int pieceNum = iterator.next();
+            int currentPos = this.positions[pieceNum - 1];
 
-        int currentPos = positions[pieceToMove - 1];
-        if (currentPos == -1) return moves;
+            if (currentPos == -1) continue;
 
-        int row = currentPos / 10;
-        int col = currentPos % 10;
+            // Special rule: If at position 11, can move to 0 (Victory)
+            if (currentPos == 11) {
+                moves.add(new Move(pieceNum, currentPos, 0));
+            }
 
-        int[][] directions = {
-                {-1, -1}, {-1, 0}, {-1, 1},
-                {0, -1},           {0, 1},
-                {1, -1},  {1, 0},  {1, 1}
-        };
+            int row = currentPos / 10;
+            int col = currentPos % 10;
 
-        for (int[] dir : directions) {
-            int newRow = row + dir[0];
-            int newCol = col + dir[1];
+            for(int dr = -1; dr <= 1; ++dr) {
+                for(int dc = -1; dc <= 1; ++dc) {
+                    if (dr != 0 || dc != 0) {
+                        int nr = row + dr;
+                        int nc = col + dc;
 
-            if (newRow >= 0 && newRow < 10 && newCol >= 0 && newCol < 10) {
-                int newPos = newRow * 10 + newCol;
-
-                if (newPos != 22) {
-                    moves.add(new Move(pieceToMove, currentPos, newPos));
+                        if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10) {
+                            int nextPos = nr * 10 + nc;
+                            // Constraint for invalid square
+                            if (nextPos != 22) {
+                                moves.add(new Move(pieceNum, currentPos, nextPos));
+                            }
+                        }
+                    }
                 }
             }
         }
-
         return moves;
     }
 
-    private int findMovablePiece() {
-        if (positions[diceNumber - 1] != -1) {
-            return diceNumber;
-        }
+    private List<Integer> findMovablePieces() {
+        // Added <Integer> to remove the warning
+        List<Integer> pieces = new ArrayList<>();
 
-        int smallestBigger = 7;
-        int largestSmaller = 0;
-
-        for (int i = 0; i < 6; i++) {
-            if (positions[i] != -1) {
-                int pieceNum = i + 1;
-
-                if (pieceNum > diceNumber && pieceNum < smallestBigger) {
-                    smallestBigger = pieceNum;
-                }
-
-                if (pieceNum < diceNumber && pieceNum > largestSmaller) {
-                    largestSmaller = pieceNum;
+        if (this.positions[this.diceNumber - 1] != -1) {
+            pieces.add(this.diceNumber);
+            return pieces;
+        } else {
+            int nextHigher = -1;
+            for(int i = this.diceNumber; i < 6; ++i) {
+                if (this.positions[i] != -1) {
+                    nextHigher = i + 1;
+                    break;
                 }
             }
-        }
 
-        if (smallestBigger != 7) return smallestBigger;
-        if (largestSmaller != 0) return largestSmaller;
-        return -1;
+            int nextLower = -1;
+            for(int i = this.diceNumber - 2; i >= 0; --i) {
+                if (this.positions[i] != -1) {
+                    nextLower = i + 1;
+                    break;
+                }
+            }
+
+            if (nextHigher != -1) pieces.add(nextHigher);
+            if (nextLower != -1) pieces.add(nextLower);
+
+            return pieces;
+        }
     }
 
     public void applyMove(Move move) {
-        int pieceIndex = move.getPieceNumber() - 1;
         int toPos = move.getToPosition();
+        int pieceIdx = move.getPieceNumber() - 1;
 
-        boolean captured = false;
-        for (int i = 0; i < positions.length; i++) {
-            if (positions[i] == toPos && i != pieceIndex) {
-                positions[i] = -1;
-                captured = true;
-                System.out.println("Captured piece " + (i+1) + " at " + toPos);
-                break;
+        for(int i = 0; i < this.positions.length; ++i) {
+            if (this.positions[i] == toPos) {
+                this.positions[i] = -1; // Piece captured
             }
         }
 
-        positions[pieceIndex] = toPos;
+        this.positions[pieceIdx] = toPos;
     }
 
     public boolean isWinning() {
-        return positions[targetPiece - 1] == 0;
+        int targetPos = this.positions[this.targetPiece - 1];
+        return targetPos == 0;
     }
 
-    public int[] getPositions() { return positions.clone(); }
-    public int getDiceNumber() { return diceNumber; }
-    public int getTargetPiece() { return targetPiece; }
+    public int[] getPositions() {
+        return this.positions;
+    }
+
+    public int getTargetPiece() {
+        return this.targetPiece;
+    }
 }
