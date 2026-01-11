@@ -23,12 +23,35 @@ public class HumanPlayer extends Player {
         }
 
         int choice = -1;
-        while (choice < 0 || choice >= possibleMoves.size()) {
+        boolean validMove = false;
+
+        while (!validMove) {
             System.out.print("Choose move (0-" + (possibleMoves.size()-1) + "): ");
             if (scanner.hasNextInt()) {
                 choice = scanner.nextInt();
+                scanner.nextLine(); // Consume newline
+
+                if (choice >= 0 && choice < possibleMoves.size()) {
+                    Move selectedMove = possibleMoves.get(choice);
+
+                    // Check if this move would capture the target piece
+                    int targetPos = state.getPositions()[state.getTargetPiece() - 1];
+                    int toPos = selectedMove.getToPosition();
+
+                    // If target piece exists and move would capture it, invalid
+                    if (targetPos != -1 && toPos == targetPos) {
+                        System.out.println("Invalid move! You cannot capture the target piece (P" +
+                                state.getTargetPiece() + " at position " + targetPos + ").");
+                        System.out.println("Please choose another move.");
+                    } else {
+                        validMove = true;
+                    }
+                } else {
+                    System.out.println("Please enter a number between 0 and " + (possibleMoves.size()-1));
+                }
             } else {
-                scanner.next();
+                System.out.println("Please enter a valid number.");
+                scanner.next(); // Clear invalid input
             }
         }
 
